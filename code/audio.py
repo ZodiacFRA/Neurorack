@@ -16,7 +16,6 @@
 
 """
 
-import sklearn
 import numpy as np
 import sounddevice as sd
 from parallel import ProcessInput

@@ -1,4 +1,3 @@
-import sklearn
 import torch
 import librosa
 import numpy as np
@@ -10,8 +9,6 @@ import tqdm
 import soundfile as sf
 import threading
 from multiprocessing import Event, Process
-from torch2trt import torch2trt
-from torch2trt import TRTModule
 
 def spectral_features(y, sr):
     features = [None] * 7
