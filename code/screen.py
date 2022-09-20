@@ -151,7 +151,7 @@ class Screen(ProcessInput):
             height=self._height,
             width=self._width,
             absolute=True,
-            signals=self._signals)
+            signals=self._signal)
 
     def startup_animation(self):
         header = 'Neurorack'

@@ -28,3 +28,66 @@ Launching python with debugging info on ARM64
 ```shell
 python -q -X faulthandler
 ```
+
+
+
+
+## JB
+
+# Flash ISO from nvidia website onto a 32GB microSD card:
+https://developer.nvidia.com/embedded/downloads#?tx=$product,jetson_nano
+Jetson Nano Developer Kit SD Card Image - 4.6.1 - 2022/02/23
+
+# update, install misc
+sudo apt update
+sudo apt install nvidia-jetpack
+sudo apt-get install libatlas-base-dev gfortran
+sudo apt-get install libopenblas-base libopenmpi-dev 
+sudo apt install nano
+
+# Install torch
+wget https://nvidia.box.com/shared/static/p57jwntv436lfrd78inwl7iml6p13fzh.whl -O torch-1.8.0-cp36-cp36m-linux_aarch64.whl -O torch-1.9.0-cp36-cp36m-linux_aarch64.whl
+sudo apt-get install python3-pip libopenblas-base libopenmpi-dev 
+pip3 install Cython
+pip3 install numpy torch-1.9.0-cp36-cp36m-linux_aarch64.whl
+
+# Install hardware libs
+pip3 install spidev
+pip3 install pimoroni-ioexpander
+pip3 install ads1015
+pip3 install setuptools cppy matplotlib
+
+# Install sound libs
+sudo apt install libffi-dev
+pip3 install sounddevice
+sudo apt install libportaudio2
+sudo apt install gfortran libopenblas-dev liblapack-dev
+
+# Librosa installation
+# If problem with tbb (version too old), rename the tbb header to prevent the building system to try linking tbb:
+sudo mv /usr/include/tbb/tbb.h /usr/include/tbb/tbb.h
+
+# then install librosa, then revert the rename
+sudo apt install llvm-10
+export LLVM_CONFIG='/usr/bin/llvm-config-10'
+pip3 install llvmlite
+pip3 install pybind11
+pip3 install scipy
+pip3 install librosa
+pip3 install smbus tqdm adafruit-circuitpython-rgb-display future
+
+# Install image libs
+sudo apt install libjpeg-dev zlib1g-dev
+sudo apt-get install libfreetype6-dev
+pip install Pillow
+pip install -U PyYAML
+
+# Enable spi
+sudo /opt/nvidia/jetson-io/jetson-io.py
+enable both spi1 and i2s
+
+# Add a cron at startup or manually re enter if you get "OSError: /dev/spidev0.0 does not exist"
+sudo modprobe spidev
+
+# Done
+

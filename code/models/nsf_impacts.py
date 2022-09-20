@@ -29,9 +29,9 @@ def spectral_features(y, sr):
 
 
 class NSF:
-    m_path = "/home/martin/Desktop/Impact-Synth-Hardware/code/models/model_nsf_sinc_ema_impacts_waveform_5.0.th"
+    m_path = "./models/model_nsf_sinc_ema_impacts_waveform_5.0.th"
     # m_path = "/home/hime/Work/Neurorack/Impact-Synth-Hardware/code/models/model_nsf_sinc_ema_impacts_waveform_5.0.th"
-    trt_path = "/home/martin/Desktop/Impact-Synth-Hardware/code/models/model_trt_5.0.th"
+    trt_path = "./models/model_trt_5.0.th"
     f_pass = 1
 
     def __init__(self):
@@ -282,7 +282,7 @@ class NSF:
 
 
 if __name__ == '__main__':
-    root_dir = "/home/hime/Work/dataset/toydataset"
+    root_dir = "/home/Music"
     wav_adresses = [files_names for files_names in os.listdir(root_dir) if
                     (files_names.endswith('.wav') or files_names.endswith('.mp3'))]
     model = NSF()

@@ -125,4 +125,4 @@ class Rotary(ProcessInput):
 
 if __name__ == '__main__':
     rotary = Rotary(None)
-    rotary.callback({'rotary':0}, None)
+    rotary.callback({'rotary': 0}, None)
