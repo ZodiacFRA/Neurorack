@@ -2,16 +2,16 @@
 
  ~ Neurorack project ~
  Audio : Class for the audio handling
- 
+
  This class contains all audio-processing stuff in the Neurorack.
      - Instantiates the deep model
      - Provides callbacks for playing
          play_noise
          play_model
- 
+
  Author               :  Ninon Devis, Philippe Esling, Martin Vert
                         <{devis, esling}@ircam.fr>
- 
+
  All authors contributed equally to the project and are listed aphabetically.
 
 """
@@ -21,6 +21,7 @@ import sounddevice as sd
 from parallel import ProcessInput
 from models.ddsp import DDSP
 from models.nsf_impacts import NSF
+from models.rave import RAVE
 from multiprocessing import Event, Process
 from config import config
 
@@ -33,7 +34,7 @@ class Audio(ProcessInput):
 
     def __init__(self,
                  callback: callable,
-                 model: str = 'nsf',
+                 model: str,
                  sr: int = 22050):
         '''
             Constructor - Creates a new instance of the Audio class.
@@ -46,7 +47,7 @@ class Audio(ProcessInput):
                             Specify the sampling rate [default: 22050]
         '''
         super().__init__('audio')
-        # Setup audio callback 
+        # Setup audio callback
         self._callback = callback
         # Create our own event signal
         self._signal = Event()
@@ -65,6 +66,8 @@ class Audio(ProcessInput):
             self._model = DDSP()
         elif self._model_name == 'nsf':
             self._model = NSF()
+        elif self._model_name == 'rave':
+            self._model = RAVE()
         else:
             raise NotImplementedError
 
@@ -88,25 +91,25 @@ class Audio(ProcessInput):
         cur_event = state["audio"]["event"]
         if cur_event in [config.events.gate0]:
             self.play_model_block(state)
-        if cur_event in [config.events.gate1]:
-            cv2 = state['cv'][2] if state['cv_active'][2] else 0.0
-            cv3 = state['buffer'][3] if state['cv_active'][3] else 1.0
-            cv4 = state['buffer'][4] if state['cv_active'][4] else 1.0
-            cv5 = state['buffer'][5] if state['cv_active'][5] else 1.0
-            print('Interpolate gate')
-            self._model.interp_final(cv2, cv3, cv4, cv5)
-        if cur_event in [config.events.cv2, config.events.cv3, config.events.cv4, config.events.cv5]:
-            cv2 = state['cv'][2] if state['cv_active'][2] else 0.0
-            cv3 = state['cv'][3] if state['cv_active'][3] else 1.0
-            cv4 = state['cv'][4] if state['cv_active'][4] else 1.0
-            cv5 = state['cv'][5] if state['cv_active'][5] else 1.0
-            print('CV LIST DETECTED - Interpolate')
-            self._model.interp_trio([cv2, cv3, cv4, cv5])
+        # if cur_event in [config.events.gate1]:
+        #     cv2 = state['cv'][2] if state['cv_active'][2] else 0.0
+        #     cv3 = state['buffer'][3] if state['cv_active'][3] else 1.0
+        #     cv4 = state['buffer'][4] if state['cv_active'][4] else 1.0
+        #     cv5 = state['buffer'][5] if state['cv_active'][5] else 1.0
+        #     print('Interpolate gate')
+        #     self._model.interp_final(cv2, cv3, cv4, cv5)
+        # if cur_event in [config.events.cv2, config.events.cv3, config.events.cv4, config.events.cv5]:
+        #     cv2 = state['cv'][2] if state['cv_active'][2] else 0.0
+        #     cv3 = state['cv'][3] if state['cv_active'][3] else 1.0
+        #     cv4 = state['cv'][4] if state['cv_active'][4] else 1.0
+        #     cv5 = state['cv'][5] if state['cv_active'][5] else 1.0
+        #     print('CV LIST DETECTED - Interpolate')
+        #     self._model.interp_trio([cv2, cv3, cv4, cv5])
 
     def set_defaults(self):
         '''
             Sets default parameters for the soundevice library.
-            See 
+            See
         '''
         sd.default.samplerate = self._sr
         sd.default.device = 1
@@ -157,7 +160,7 @@ class Audio(ProcessInput):
 
     def play_model_block(self, state, wait: bool = True):
         '''
-            Play a sinus signal 
+            Play a sinus signal
             Parameters:
                 amplitude:  [float], optional
                             Amplitude of the sinusoid
@@ -166,18 +169,12 @@ class Audio(ProcessInput):
         '''
 
         def callback_block(outdata, frames, time, status):
-            # print('Start of call block')
-            # print(outdata.shape)
-            # cur_data = self._model.request_block(self.cur_idx)[:, np.newaxis]
-            cur_data = self._model.request_block_threaded(self.cur_idx)
+            cur_data = self._model.generate_random()
             if cur_data is None:
-                # print('Stream stopping (end of features)')
                 raise sd.CallbackStop()
             outdata[:] = cur_data[:, np.newaxis]
-            self.cur_idx += 1
 
-        self.cur_idx = 0
-        self._model.signal_start_stream()
+        # self._model.signal_start_stream()
         if self._cur_stream == None:
             self._cur_stream = sd.OutputStream(callback=callback_block, blocksize=512, channels=1, samplerate=self._sr)
             self._cur_stream.start()
@@ -190,7 +187,7 @@ class Audio(ProcessInput):
 
     def play_sine_block(self, amplitude=1.0, frequency=440.0):
         '''
-            Play a sinus signal 
+            Play a sinus signal
             Parameters:
                 amplitude:  [float], optional
                             Amplitude of the sinusoid
@@ -232,7 +229,7 @@ class Audio(ProcessInput):
 
     def play_sine_block(self, amplitude=1.0, frequency=440.0):
         '''
-            Play a sinus signal 
+            Play a sinus signal
             Parameters:
                 amplitude:  [float], optional
                             Amplitude of the sinusoid

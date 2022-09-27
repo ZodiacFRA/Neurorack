@@ -31,7 +31,7 @@ class Neurorack():
             - Screen
     '''
 
-    def __init__(self):
+    def __init__(self, model_name):
         '''
             Constructor - Creates a new instance of the Neurorack class.
         '''
@@ -40,7 +40,7 @@ class Neurorack():
         # Init states of information
         self.init_state()
         # Create audio engine
-        self._audio = Audio(self.callback_audio)
+        self._audio = Audio(self.callback_audio, model_name)
         # Create rotary
         self._rotary = Rotary(self.callback_rotary)
         # Create CV channels
@@ -210,6 +210,6 @@ if __name__ == '__main__':
     parser.add_argument('--device',         type=str, default='cuda:0',     help='device cuda or cpu')
     # Parse the arguments
     args = parser.parse_args()
-    neuro = Neurorack()
+    neuro = Neurorack("rave")
     neuro.start()
     neuro.run()
