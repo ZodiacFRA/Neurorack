@@ -84,7 +84,7 @@ pip install -U PyYAML
 
 # Enable spi
 sudo /opt/nvidia/jetson-io/jetson-io.py
-enable both spi1 and i2s
+enable both spi1 and i2s4
 
 # Add a cron at startup or manually re enter if you get "OSError: /dev/spidev0.0 does not exist"
 sudo modprobe spidev
