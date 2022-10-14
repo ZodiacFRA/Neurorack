@@ -10,7 +10,7 @@ class RAVE():
     def __init__(self):
         self.model = None
         self.torch = None
-        self.m_path = "./models/nasa.ts"
+        self.m_path = "./models/vintage.ts"
         self.f_pass = 3
 
     def preload(self):
@@ -22,53 +22,62 @@ class RAVE():
         print("Loading RAVE model")
         self.model = self.torch.jit.load(self.m_path, map_location="cuda")
         print("RAVE model loaded")
-        self.burn_in()
+        # self.burn_in()
 
-    def generate_prior_random(self, length=48):
-        # length 1 = 2048, 24 ~= 1sec
-        # print('Prior generation, random, length ' + str(length))
-        # Batch, Channels, length
-        x = self.torch.randn(1, 1, length).cuda()
-        with self.torch.no_grad():
-            # 1 temperature value for each time step, outputs [n_latents, length]
-            lat = self.model.prior(x)
-            # Decode
-            audio = self.model.decode(lat)
-        # Multiply by 10 to get the proper volume
-        tmp = audio.squeeze(0).squeeze(-1).cpu()[0]
-        amp = self.torch.max(tmp) - self.torch.min(tmp)
-        if amp == 0:
-            amp = 0.01
-        tmp = self.torch.mul(tmp, 10 / amp)
-        print(tmp.shape)
-        print(f"Model generation min: {self.torch.min(tmp)} / max: {self.torch.max(tmp)}")
-        return tmp
+    # def test(self, length=48):
+    #     # length 1 = 2048, 24 ~= 1sec
+    #     flag = False
+    #     if length != 4:
+    #         flag = True
+    #         length = 4
+    #     with self.torch.no_grad():
+    #         # 1 temperature value for each time step, outputs [n_latents, length]
+    #         if flag:
+    #             start_time = time.time()
+    #             test = self.model.prior(self.torch.randn(1, 1, length).cuda())
+    #             print("time:", time.time() - start_time)
+    #         lat = self.torch.randn(1, 8, length).cuda()
+    #         print("random", lat.shape)
+    #         audio = self.model.decode(lat)
+    #         audio = audio.squeeze(0).squeeze(-1)[0]
+    #     # print(f"Model generation min: {self.torch.min(audio)} / max: {self.torch.max(audio)}")
+    #     return audio.cpu()
 
     def generate_random(self, length=48):
         # length 1 = 2048, 24 ~= 1sec
-        # print('generation, random, length ' + str(length))
-        # Batch, Channels, length
-        lat = self.torch.randn(1, 8, length).cuda()
         with self.torch.no_grad():
             # 1 temperature value for each time step, outputs [n_latents, length]
-            # Decode
+            lat = self.torch.randn(1, 8, length).cuda()
             audio = self.model.decode(lat)
-        # Multiply by 10 to get the proper volume
-        tmp = audio.squeeze(0).squeeze(-1)[0]
-        amp = self.torch.max(tmp) - self.torch.min(tmp)
-        if amp == 0:
-            amp = 0.01
-        tmp = self.torch.mul(tmp, 2)
-        print(tmp.shape)
-        print(f"Model generation min: {self.torch.min(tmp)} / max: {self.torch.max(tmp)}")
-        return tmp.cpu()
+            audio = audio.squeeze(0).squeeze(-1)[0]
+        # print(f"Model generation min: {self.torch.min(audio)} / max: {self.torch.max(audio)}")
+        return audio.cpu()
+
+    def generate_prior(self, length=48):
+        # length 1 = 2048, 24 ~= 1sec
+        with self.torch.no_grad():
+            # 1 temperature value for each time step, outputs [n_latents, length]
+            lat = self.model.prior(self.torch.randn(1, 1, length).cuda())
+            audio = self.model.decode(lat)
+            audio = audio.squeeze(0).squeeze(-1)[0]
+        # print(f"Model generation min: {self.torch.min(audio)} / max: {self.torch.max(audio)}")
+        return audio.cpu()
 
     def forward(self, audio):
-        print('forward')
         with self.torch.no_grad():
-            # 1 temperature value for each time step, outputs [n_latents, length]
-            audio = self.model(audio)
-        return audio.squeeze(0).squeeze(-1)
+            audio = self.model(self.torch.tensor(audio).cuda().float())
+            audio = audio.squeeze(0).squeeze(0)
+        return audio.cpu()
+
+    def encode(self, audio):
+        with self.torch.no_grad():
+            lats = self.model.encode(self.torch.tensor(audio).cuda().float())
+        return lats
+
+    def decode(self, lats):
+        with self.torch.no_grad():
+            audio = self.model.decode(lats)
+        return audio.cpu().squeeze(0)
 
     def burn_in(self):
         for p in range(self.f_pass):

@@ -15,8 +15,11 @@
  All authors contributed equally to the project and are listed aphabetically.
 
 """
+import time
+
 import numpy as np
 import sounddevice as sd
+import librosa
 from parallel import ProcessInput
 # from models.ddsp import DDSP
 # from models.nsf_impacts import NSF
@@ -35,7 +38,7 @@ class Audio(ProcessInput):
     def __init__(self,
                  callback: callable,
                  model: str,
-                 sr: int = 48000):
+                 sr: int = 22050):
         '''
             Constructor - Creates a new instance of the Audio class.
             Parameters:
@@ -44,7 +47,7 @@ class Audio(ProcessInput):
                 model:      [str], optional
                             Specify the audio model to load
                 sr:         int, optional
-                            Specify the sampling rate [default: 22050]
+                            Specify the sampling rate
         '''
         super().__init__('audio')
         # Setup audio callback
@@ -60,6 +63,18 @@ class Audio(ProcessInput):
         self._cur_stream = None
         # Set model
         self.load_model()
+        # frame length
+        self.frame_len = 8192
+        # For the sinewave & sample play
+        self.start_idx = 0
+        self.tmp_flag = 0
+        
+        self.sample, sr = librosa.load("data/Alborosie.wav", sr=self._sr, duration=10.0)
+        print("loaded sample, normalized from", np.amax(self.sample))
+        self.sample = self.sample / np.amax(self.sample)
+        print(self.sample.shape, sr)
+        self.max_idx = (self.sample.shape[0] // self.frame_len) * self.frame_len
+        print(self.max_idx, "max idx")
 
     def load_model(self):
         # if self._model_name == 'ddsp':
@@ -73,7 +88,7 @@ class Audio(ProcessInput):
 
     def callback(self, state, queue):
         # First perform a model burn-in
-        print('Performing model burn-in')
+        # print('Performing model burn-in')
         state["audio"]["mode"].value = config.audio.mode_burnin
         self._model.preload()
         # Then switch to wait (idle) mode
@@ -90,7 +105,6 @@ class Audio(ProcessInput):
     def handle_signal_event(self, state):
         cur_event = state["audio"]["event"]
         if cur_event in [config.events.gate0]:
-            # self._model.generate_prior_random(state)
             self.play_model_block(state)
 
     def set_defaults(self):
@@ -107,6 +121,70 @@ class Audio(ProcessInput):
         sd.default.dither_off = False
         sd.default.never_drop_input = False
 
+
+    def get_sin(self, frames, amplitude=1.0, frequency=440.0):
+        t = (self.start_idx + np.arange(frames)) / self._sr
+        t = t.reshape(-1, 1)
+        self.start_idx += frames
+        tmp = amplitude * np.sin(2 * np.pi * frequency * t)
+        tmp = tmp.swapaxes(0, 1)
+        tmp = np.expand_dims(tmp, 0)
+        return tmp
+
+    def play_model_block(self, state, wait: bool = True):
+        def callback_block(outdata, frames, time_c, status):
+            start_time = time.time()
+            # # sin = self.get_sin(frames) 
+
+            ####################
+            # Sample generation
+            sample = self.sample[self.start_idx:self.start_idx + frames]  # 154336,
+            self.start_idx += frames
+            if self.start_idx >= self.max_idx:
+                self.start_idx = 0
+                print("sample looped")
+            sample = np.expand_dims(sample, 0)
+            sample = np.expand_dims(sample, 0)
+            lats = self._model.encode(sample)
+            print(lats.shape)
+            # if state['cv_active'][2]:
+                # print("*", state['cv'][2], "for lat 0")
+                # lats[0][0] *= state['cv'][2] 
+            if state['cv_active'][3]:
+                print("*", state['cv'][3], "for lat 1")
+                lats[0][1] *= state['cv'][3] 
+            if state['cv_active'][4]:
+                lats[0][2] *= state['cv'][4] 
+            if state['cv_active'][5]:
+                lats[0][3] *= state['cv'][5] 
+            cur_data = self._model.decode(lats)[0]
+
+            # # print("input shape", sample.shape)  # Must be [1, 1, frames]
+            # # cur_data = self.sample[self.start_idx:self.start_idx + frames]
+            # print("output shape", cur_data.shape)  # Must be [frames]
+            
+            # cur_data = self._model.generate_random(2)
+            
+            # outdata[:] = np.random.rand(frames, 1)
+            # print("noise")
+
+            if cur_data is None:
+                raise sd.CallbackStop()
+            outdata[:] = cur_data[:, np.newaxis]
+            print("time:", time.time() - start_time)
+
+        if self._cur_stream == None:
+            self._cur_stream = sd.OutputStream(blocksize=self.frame_len, callback=callback_block, channels=1, samplerate=self._sr)
+            self._cur_stream.start()
+            print('Stream launched')
+        elif not self._cur_stream.active:
+            print('Restart stream')
+            self._cur_stream.close()
+            self._cur_stream = sd.OutputStream(blocksize=self.frame_len, callback=callback_block, channels=1, samplerate=self._sr)
+            self._cur_stream.start()
+    
+    ###########################################
+    
     def play_model(self, state, wait: bool = True):
         '''
             Play some random noise of a given length for checkup.
@@ -127,29 +205,6 @@ class Audio(ProcessInput):
             self.wait_playback()
         state["audio"]["mode"].value = config.audio.mode_idle
         print("play_model end")
-
-    def play_model_block(self, state, wait: bool = True):
-        def callback_block(outdata, frames, time, status):
-            print('-----------')
-            cur_data = self._model.generate_random(1)
-            if cur_data is None:
-                raise sd.CallbackStop()
-            
-            # print(cur_data.shape)
-            # print(outdata.shape)
-            outdata[:] = cur_data[:, np.newaxis]
-            # print(outdata.shape)
-            # outdata[:] = np.random.rand(2048, 1)
-
-        if self._cur_stream == None:
-            self._cur_stream = sd.OutputStream(blocksize=2048, callback=callback_block, channels=1, samplerate=self._sr)
-            self._cur_stream.start()
-            print('Stream launched')
-        elif not self._cur_stream.active:
-            print('Restart stream')
-            self._cur_stream.close()
-            self._cur_stream = sd.OutputStream(blocksize=2048, callback=callback_block, channels=1, samplerate=self._sr)
-            self._cur_stream.start()
 
     def play_noise(self, wait: bool = True, length: int = 2):
         '''
